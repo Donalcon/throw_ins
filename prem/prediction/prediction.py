@@ -1,84 +1,56 @@
-from engine.throw_fe import feature_engineering
-from engine.future_scraper import scrape_single_match
-from engine.throws.copa.copa_throw_pred_cleaner import simple_cleaner, stats_cols, cols_not_for_modelling
+import logging
+from prem.utils.fixed import stats_cols, cols_not_for_modelling, categorical_columns
 import pandas as pd
-from joblib import load
 
-from src.models.model_cleaner import filter_teams, european_countries
+logger = logging.getLogger(__name__)
 
-# Scrape today's fixtures
-todays_urls = ['https://www.fotmob.com/en-GB/matches/uruguay-vs-colombia/1mt1jb#4407873']
-dfs = []
-game_id = 2000
-for url in todays_urls:
-    try:
-        df = scrape_single_match(url)
-        df['game_id'] = game_id
-        game_id += 1
-        dfs.append(df)
-    except Exception as e:
-        print(f"Error scraping data from {url}: {e}")
-
-# Step 3: Concatenate the dataframes into a single dataframe
-todays_df = pd.concat(dfs, ignore_index=True)
-todays_df = simple_cleaner(todays_df)
-# Load in processed Data
-processed_data = pd.read_csv('data/int_processed_master.csv')
-
-processed_data['datetime'] = pd.to_datetime(processed_data['datetime'])
-# Join them
-master_data = pd.concat([processed_data, todays_df], axis=0)
-
-# make all stats_cols float
-master_data[stats_cols] = master_data[stats_cols].astype(float)
-master_data['ranking'] = master_data['ranking'].astype(int)
-master_data['opp_ranking'] = master_data['opp_ranking'].astype(int)
-
-master_data = feature_engineering(master_data, stats_cols)
-
-# drop columns not for modelling from full_df if they are in full_df
-pred_df = master_data.drop(columns=cols_not_for_modelling, errors='ignore')
-# print number of na's in every column
-for col in pred_df.columns:
-    print(f"Column: {col}, nans: {pred_df[col].isna().sum()}")
-
-# drop ['throws', 'datetime', 'game_id', 'accurate_long_balls_pc'])
-# pred_df.drop(['datetime', 'game_id'], axis=1, inplace=True)
-pred_df['team_id'] = pred_df['team_id'].astype('category')
-pred_df['opp_id'] = pred_df['opp_id'].astype('category')
-pred_df['referee_id'] = pred_df['referee_id'].astype('category')
-pred_df['round'] = pred_df['round'].astype('category')
-pred_df['division'] = pred_df['division'].astype('category')
-pred_df = pd.get_dummies(pred_df)
-
-# Remove all rows from master data that are not in todays_df, use game_id to identify
-pred_df = pred_df[pred_df['game_id'].isin(todays_df['game_id'])]
-# drop game_id
-pred_df.drop(['game_id', 'throws'], axis=1, inplace=True)
-
-# CHECK FOR ANY COLUMNS THAT ARE NOT INT, FLOAT OR BOOL
-print("COLUMNS NOT IN CORRECT DTYPE:", pred_df.select_dtypes(exclude=['int', 'float', 'bool']).columns)
-
-# # MAKE PREDICTIONS
-throw_model = load('throw_in_XGB_SMOTE_optuna.joblib')
-throw_features = throw_model.get_booster().feature_names
-
-# Check if all expected features are present and match
-missing_from_model = [f for f in throw_features if f not in pred_df.columns]
-extra_in_model = [f for f in pred_df.columns if f not in throw_features]
-
-print("Features expected by model and missing in data:", missing_from_model)
-print("Extra features in data not expected by model:", extra_in_model)
-# make extra_in_model columns in pred_df and set to 0
-for col in extra_in_model:
-    pred_df[col] = 0
+# Example of how class_mapping should be structured (use the same mapping from training)
+class_mapping = {
+    0: 'low_tail',
+    1: 9, 2: 10, 3: 11, 4: 12, 5: 13, 6: 14, 7: 15, 8: 16, 9: 17, 10: 18, 11: 19, 12: 20,
+    13: 21, 14: 22, 15: 23, 16: 24, 17: 25, 18: 26, 19: 27, 20: 28, 21: 29, 22: 'high_tail'
+}
 
 
-throw_df = pred_df[throw_features]
-# print cols with nan values
-print("Columns with nan values:", throw_df.columns[throw_df.isna().any()].tolist())
-total_throws_predictions = throw_model.predict(throw_df)
-todays_df['pred_throws'] = total_throws_predictions
+def predictor(prediction_df, next_games, model):
+    # Final Processing
+    prediction_df = prediction_df.drop(columns=cols_not_for_modelling, errors='ignore')
+    continuous_columns = prediction_df.columns.difference(categorical_columns + ['datetime'])
+    # Convert categorical columns to categorical type
+    for col in categorical_columns:
+        prediction_df[col] = prediction_df[col].astype('category')
+    # One-hot encode the categorical features (if not using XGBoost's built-in categorical support)
+    full_df_categorical = pd.get_dummies(prediction_df[categorical_columns], drop_first=True)
+    full_df_continuous = prediction_df[continuous_columns]
+    # Combine the one-hot encoded categorical features with the continuous features
+    prediction_df = pd.concat([full_df_categorical, full_df_continuous], axis=1)
+    # Remove all rows from master data that are not in todays_df, use game_id to identify
+    prediction_df = prediction_df[prediction_df['game_id'].isin(next_games['game_id'])]
+    # drop game_id
+    prediction_df.drop(['game_id', 'throws'], axis=1, inplace=True)
 
+    # CHECK
+    logger.info("COLUMNS NOT IN CORRECT DTYPE:", prediction_df.select_dtypes(exclude=['int', 'float', 'bool']).columns)
 
+    # Predictions
+    throw_features = model.get_booster().feature_names
+    # Check if all expected features are present and match
+    missing_from_model = [f for f in throw_features if f not in prediction_df.columns]
+    extra_in_model = [f for f in prediction_df.columns if f not in throw_features]
 
+    logger.info("Features expected by model and missing in data:", missing_from_model)
+    logger.info("Extra features in data not expected by model:", extra_in_model)
+
+    throw_df = prediction_df[throw_features]
+    print("Columns with nan values:", throw_df.columns[throw_df.isna().any()].tolist())
+
+    # Get the predicted classes
+    predicted_classes = model.predict(throw_df)
+
+    # Map predicted classes back to original throw values (including 'low_tail' and 'high_tail')
+    predicted_throws = [class_mapping[pred_class] for pred_class in predicted_classes]
+
+    next_games['pred_throws'] = predicted_throws
+    prediction = next_games[['team', 'opp', 'datetime', 'pred_throws']]
+
+    return prediction

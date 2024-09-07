@@ -268,6 +268,7 @@ cols_not_for_modelling = [
     'successful_dribbles',
     'successful_dribbles_pc',
     'total_tackles',
+    'throws'
     'conc_xg',
     'conc_total_shots',
     'conc_shots_on_target',

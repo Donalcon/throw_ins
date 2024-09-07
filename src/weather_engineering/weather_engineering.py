@@ -125,6 +125,7 @@ def weather_engineering(df, perspective):
         DataFrame: The resulting DataFrame with shots data merged with weather data.
     """
 
+    df = df.dropna(subset=['latitude', 'longitude'])
     df['datetime'] = pd.to_datetime(df['datetime'], utc=True)
     df['date'] = df['datetime'].dt.date
     df.sort_values(by='datetime', inplace=True)

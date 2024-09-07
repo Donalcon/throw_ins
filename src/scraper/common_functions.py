@@ -28,6 +28,7 @@ def count_urls_in_file(file_path):
         print(f"The file {file_path} does not exist.")
         return 0
 
+
 def count_urls_in_directory(directory_path):
     try:
         files = os.listdir(directory_path)
@@ -41,13 +42,3 @@ def count_urls_in_directory(directory_path):
     except FileNotFoundError:
         print(f"The directory {directory_path} does not exist.")
         return {}
-
-# Specify the path to your directory
-directory_path = 'data/urls/'
-
-# Count the number of URLs in each file in the directory
-url_counts = count_urls_in_directory(directory_path)
-
-# Print the result
-for file_name, count in url_counts.items():
-    print(f"The number of URLs in {file_name} is: {count}")

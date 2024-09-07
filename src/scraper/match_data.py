@@ -34,15 +34,15 @@ def std_single_match(driver, url):
             consent_button.click()
         except Exception:
             pass
-        # Check for extra time or penalties
-        try:
-            ET_pens_xpath = '/html/body/div[1]/main/main/div[2]/div/div[1]/div[1]/div/section/div/section/header/div[2]/span'
-            ET_pens = wait.until(EC.visibility_of_element_located((By.XPATH, ET_pens_xpath))).text
-            if 'extra' in ET_pens.lower() or 'pen' in ET_pens.lower():
-                print(f"Extra time match: {url}, skipping.")
-                return None  # Indicate to skip this URL
-        except Exception:
-            pass
+        # # Check for extra time or penalties
+        # try:
+        #     ET_pens_xpath = '/html/body/div[1]/main/main/div[2]/div/div[1]/div[1]/div/section/div/section/header/div[2]/span'
+        #     ET_pens = wait.until(EC.visibility_of_element_located((By.XPATH, ET_pens_xpath))).text
+        #     if 'extra' in ET_pens.lower() or 'pen' in ET_pens.lower():
+        #         print(f"Extra time match: {url}, skipping.")
+        #         return None  # Indicate to skip this URL
+        # except Exception:
+        #     pass
 
         try:
             team1_xpath = "/html/body/div[1]/main/main/div[2]/div/div[1]/div[1]/div/section/div/section/header/div[1]/a/div/span/span[2]"
@@ -53,17 +53,34 @@ def std_single_match(driver, url):
             print(f"Team names not found for URL: {url}")
             return pd.DataFrame()
 
-        team1_ranking, team2_ranking = None, None
-        try:
-            team1_ranking_xpath = "//*[@id='__next']/main/main/div[2]/div/div[1]/div[1]/div/section/div/section/header/div[1]/a/div/span/span[3]"
-            team2_ranking_xpath = "//*[@id='__next']/main/main/div[2]/div/div[1]/div[1]/div/section/div/section/header/div[3]/a/div/span/span[3]"
-            team1_ranking = wait.until(EC.visibility_of_element_located((By.XPATH, team1_ranking_xpath))).text.split('#')[-1].strip()
-            team2_ranking = wait.until(EC.visibility_of_element_located((By.XPATH, team2_ranking_xpath))).text.split('#')[-1].strip()
-        except TimeoutException:
-            print(f"FIFA rankings not found for URL: {url}")
+        # team1_ranking, team2_ranking = None, None
+        # try:
+        #     team1_ranking_xpath = "//*[@id='__next']/main/main/div[2]/div/div[1]/div[1]/div/section/div/section/header/div[1]/a/div/span/span[3]"
+        #     team2_ranking_xpath = "//*[@id='__next']/main/main/div[2]/div/div[1]/div[1]/div/section/div/section/header/div[3]/a/div/span/span[3]"
+        #     team1_ranking = wait.until(EC.visibility_of_element_located((By.XPATH, team1_ranking_xpath))).text.split('#')[-1].strip()
+        #     team2_ranking = wait.until(EC.visibility_of_element_located((By.XPATH, team2_ranking_xpath))).text.split('#')[-1].strip()
+        # except TimeoutException:
+        #     print(f"FIFA rankings not found for URL: {url}")
 
-        match_datetime, venue, venue_href, competition, referee, attendance, possession_t1, possession_t2 = (
-            None, None, None, None, None, None, None, None)
+        try:
+            score_xpath = '/html/body/div[1]/main/main/div[2]/div/div[1]/div[1]/div/section/div/section/header/div[2]/span[1]'
+            score_text = wait.until(EC.visibility_of_element_located((By.XPATH, score_xpath))).text
+            try:
+                home_goals, away_goals = map(int, score_text.split(' - '))
+            except ValueError:
+                score_xpath2 = '/html/body/div[1]/main/main/div[2]/div/div[1]/div[1]/div/section/div/section/header/div[2]/div/span'
+                score_text2 = wait.until(EC.visibility_of_element_located((By.XPATH, score_xpath2))).text
+                home_goals, away_goals = map(int, score_text2.split(' - '))
+        except TimeoutException:
+            print(f"Score not found for URL: {url}")
+            return pd.DataFrame()
+
+        match_datetime = None
+        venue = None
+        venue_href = None
+        competition = None
+        possession_t1 = None
+        possession_t2 = None
 
         try:
             datetime_xpath = "//*[@id='__next']/main/main/div[2]/div/div[1]/div[1]/div/section/div/div[2]/section/ul/li[1]/div/time"
@@ -124,14 +141,14 @@ def std_single_match(driver, url):
             print(f"Stats containers not found for URL: {url}")
             return pd.DataFrame()
 
-        team1_data = {
-            'url': url, 'team': team1_name, 'ranking': team1_ranking, 'opp': team2_name, 'opp_ranking': team2_ranking,
+        team1_data = { # 'team_ranking': team1_ranking, 'opp_ranking': team2_ranking,
+            'url': url, 'team': team1_name,  'opp': team2_name, 'team_goals': home_goals, 'opp_goals': away_goals,
             'datetime': match_datetime, 'stadium': venue, 'referee': referee, 'attendance': attendance,
             'competition': competition, 'possession': possession_t1, 'opp_possession': possession_t2,
             'venue_href': venue_href
         }
-        team2_data = {
-            'url': url, 'team': team2_name, 'ranking': team2_ranking, 'opp': team1_name, 'opp_ranking': team1_ranking,
+        team2_data = { # 'opp_ranking': team1_ranking, 'ranking': team2_ranking
+            'url': url, 'team': team2_name, 'opp': team1_name, 'team_goals': away_goals, 'opp_goals': home_goals,
             'datetime': match_datetime, 'stadium': venue, 'referee': referee, 'attendance': attendance,
             'competition': competition, 'possession': possession_t2, 'opp_possession': possession_t1,
             'venue_href': venue_href

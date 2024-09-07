@@ -4,10 +4,6 @@ import pickle
 
 
 def cleaner(raw_data):
-    # drop expected goals columns
-    # raw_data = raw_data.drop(columns=['expected_goals_(xg)', 'xg_open_play', 'xg_set_play', 'non-penalty_xg',
-    #                                   'xg_on_target_(xgot)', 'conc_expected_goals_(xg)', 'conc_xg_open_play',
-    #                                   'conc_xg_set_play', 'conc_non-penalty_xg', 'conc_xg_on_target_(xgot)'])
     raw_data = raw_data.drop_duplicates()
     raw_data['ranking'] = raw_data['ranking'].astype(int)
     raw_data['total_tackles'] = raw_data['tackles_won'] / (raw_data['tackles_won_pc'] / 100)
@@ -136,7 +132,6 @@ def cleaner(raw_data):
 stats_cols = [
     'possession',
     'opp_possession',
-    'expected_goals_(xg)',
     'total_shots',
     'shots_on_target',
     'big_chances',

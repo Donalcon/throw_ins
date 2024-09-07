@@ -82,7 +82,7 @@ pred_df = pred_df[pred_df['game_id'].isin(todays_df['game_id'])]
 pred_df.drop('game_id', axis=1, inplace=True)
 
 # CHECK FOR ANY COLUMNS THAT ARE NOT INT, FLOAT OR BOOL
-print("COLUMNS NOT IN CORRECT DTYPE:", pred_df.select_dtypes(exclude=['int', 'float', 'bool']).columns)
+print("COLUMNS NOT IN CORRECT DTYPE:", pred_df.select_dtypes(exclude=['international', 'float', 'bool']).columns)
 
 # # MAKE PREDICTIONS
 # throw_model = load('throw_in_XGB_final.joblib')

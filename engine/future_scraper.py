@@ -44,8 +44,8 @@ def scrape_single_match(test_url):
         return pd.DataFrame()
 
     # Scrape datetime, stadium, attendance, and competition
-    match_datetime, stadium, competition, venue, referee, venue_href = (
-        None, None, None, None, None, None)
+    match_datetime, stadium, competition, attribute_3, attribute_4, possession_t1, possession_t2 = (
+        None, None, None, None, None, None, None)
 
     try:
         datetime_xpath = "//*[@id='__next']/main/main/div[2]/div/div[1]/div[1]/div/section/div/div[2]/section/ul/li[1]/div/time"
@@ -53,15 +53,23 @@ def scrape_single_match(test_url):
     except TimeoutException:
         print(f"Datetime not found for URL: {test_url}")
 
-    # Extract referee
-    referee = extract_attribute_data(driver, "Reveree")
-    if not referee:
-        referee = extract_attribute_data(driver, "Referee")
+    try:
+        stadium_xpath = "//*[@id='__next']/main/main/div[2]/div/div[1]/div[1]/div/section/div/div[2]/section/ul/li[2]/a/span"
+        stadium = wait.until(EC.visibility_of_element_located((By.XPATH, stadium_xpath))).text
+    except TimeoutException:
+        print(f"Stadium not found for URL: {test_url}")
 
-    # Extract venue
-    venue_data = extract_attribute_data(driver, "Venue")
-    if venue_data:
-        venue, venue_href = venue_data
+    try:
+        attribute_3_xpath = "//*[@id='__next']/main/main/div[2]/div/div[1]/div[1]/div/section/div/div[2]/section/ul/li[3]/div/span"
+        attribute_3 = wait.until(EC.visibility_of_element_located((By.XPATH, attribute_3_xpath))).text
+    except TimeoutException:
+        print(f"Attribute 3 not found for URL: {test_url}")
+
+    try:
+        attribute_4_xpath = "//*[@id='__next']/main/main/div[2]/div/div[1]/div[1]/div/section/div/div[2]/section/ul/li[4]/div/span"
+        attribute_4 = wait.until(EC.visibility_of_element_located((By.XPATH, attribute_4_xpath))).text
+    except TimeoutException:
+        print(f"Attribute 4 not found for URL: {test_url}")
 
     try:
         competition_xpath = "//*[@id='__next']/main/main/div[2]/div/div[1]/div[1]/div/section/div/div[1]/div/div[2]/a/span"
@@ -81,15 +89,18 @@ def scrape_single_match(test_url):
     except TimeoutException:
         print(f"FIFA rankings not found for URL: {test_url}")
 
+
+
+    # Initialize dictionaries for each team
     team1_data = {
         'team': team1_name, 'ranking': team1_ranking, 'opp': team2_name, 'opp_ranking': team2_ranking,
-        'datetime': match_datetime, 'stadium': venue, 'referee': referee,
-        'competition': competition,'venue_href': venue_href
+        'datetime': match_datetime, 'stadium': stadium, 'attribute_3': attribute_3, 'attribute_4': attribute_4,
+        'competition': competition,
     }
     team2_data = {
         'team': team2_name, 'ranking': team2_ranking, 'opp': team1_name, 'opp_ranking': team1_ranking,
-        'datetime': match_datetime, 'stadium': venue, 'referee': referee,
-        'competition': competition, 'venue_href': venue_href
+        'datetime': match_datetime, 'stadium': stadium, 'attribute_3': attribute_3, 'attribute_4': attribute_4,
+        'competition': competition,
     }
 
     # Create DataFrames
@@ -112,16 +123,3 @@ def scrape_single_match(test_url):
     # make all column names lowercase and replace spaces with underscores
     df.columns = df.columns.str.lower().str.replace(' ', '_')
     return df
-
-
-def extract_attribute_data(driver, class_name_keyword):
-    try:
-        # Find the element using XPath with contains() to match partial class names
-        element = driver.find_element(By.XPATH, f"//*[contains(@class, '{class_name_keyword}')]")
-        text = element.find_element(By.TAG_NAME, 'span').text
-        if 'Venue' in class_name_keyword:
-            href = element.get_attribute('href')
-            return text, href
-        return text
-    except Exception as e:
-        print(f"Failed to extract data for {class_name_keyword}: {e}")

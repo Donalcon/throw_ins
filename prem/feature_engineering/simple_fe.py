@@ -1,7 +1,8 @@
 import numpy as np
 import pandas as pd
 import pickle
-from src.prem.feature_engineering.elo import calculate_elo
+from prem.feature_engineering.elo import calculate_elo, add_latest_results
+from prem.utils.fixed import team_name_mapping
 
 
 def calculate_h2h(df, stat_columns):
@@ -264,8 +265,8 @@ def calculate_average_throw_ins_adjusted_for_rank_diff(df):
         previous_matches = previous_matches[previous_matches['game_id'] != current_game]
         # Calculate average throw-ins against similar quality opponents (within ±5 rank difference)
         similar_quality_matches = previous_matches[
-            (previous_matches['elo_diff'] >= rank_diff - 6) &
-            (previous_matches['elo_diff'] <= rank_diff + 6)
+            (previous_matches['elo_diff'] >= rank_diff - 100) &
+            (previous_matches['elo_diff'] <= rank_diff + 100)
             ]
 
         if not similar_quality_matches.empty:
@@ -404,28 +405,32 @@ def calculate_avg_tackles_adj_opp_poss(df):
 
 
 def feature_engineering(df, stats_cols):
-    df = pd.read_csv('./data/prem/processed/processed_master_throws.csv')
-    latest_results = pd.read_csv('./data/prem/raw/prem_results_master.csv')
-    latest_results['DateTime'] = pd.to_datetime(latest_results['DateTime'])
-    # sort both df's from earliest to latest
+
+    # ELO
+    latest_results = add_latest_results(df)
     df['datetime'] = pd.to_datetime(df['datetime'])
-    df = df.sort_values(by='datetime').reset_index(drop=True)
-    latest_results = latest_results.sort_values(by='DateTime').reset_index(drop=True)
+    df['date'] = df['datetime'].dt.date
+    df = df.sort_values(by='date').reset_index(drop=True)
+    latest_results = latest_results.sort_values(by='date').reset_index(drop=True)
     df, elo_ratings = calculate_elo(latest_results, df)
-    df = calculate_averages(df, stats_cols)
+    # df['team_elo'] = df['team_elo'].fillna(1500)
+    # df['opp_elo'] = df['opp_elo'].fillna(1500)
     df['elo_diff'] = df['team_elo'] - df['opp_elo']
+
+    # Averages
+    df = calculate_averages(df, stats_cols)
     df = calculate_rolling_averages(df, stats_cols)
     df = calculate_average_throw_ins_adjusted_for_opp_quality(df)
     df = calculate_average_throw_ins_adjusted_for_rank_diff(df)
     df = calculate_avg_throw_ins_adj_opp_poss(df)
-    df = add_opponent_stats(df, stats_cols)
-    # df = calculate_avg_throw_ins_adj_opp_pass(df)
 
+    # Opponent stats
+    df = add_opponent_stats(df, stats_cols)
+
+    # df = calculate_avg_throw_ins_adj_opp_pass(df)
     # df = calculate_average_tackles_adjusted_for_opp_quality(df)
     # df = calculate_avg_tackles_adj_opp_poss(df)
-
     # df = calculate_h2h(df, stats_cols)
-    df = calculate_team_div_averages(df, stats_cols)
     # df = calculate_div_averages(df, stats_cols)
-
-    return df
+    df.to_csv('./prem/data/preprocessed/prem_preprocessed_master.csv', index=False)
+    return df, elo_ratings

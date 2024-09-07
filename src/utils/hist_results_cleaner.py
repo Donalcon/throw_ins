@@ -7,3 +7,6 @@ prem_results['DateTime'] = pd.to_datetime(prem_results['DateTime'])
 prem_results = prem_results[prem_results['DateTime'].dt.year >= 2019]
 # filter to only cols: Season, HomeTeam, AwayTeam, FTHG, FTAG, FTR, DateTime
 prem_results = prem_results[['Season', 'HomeTeam', 'AwayTeam', 'FTHG', 'FTAG', 'DateTime']]
+# save to csv
+prem_results.to_csv('data/prem/raw/prem_results.csv', index=False)
+# drop
